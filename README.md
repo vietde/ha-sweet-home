@@ -1,30 +1,18 @@
 # Sweet Floor Card
 
-One file, no dependencies, no restart: a dollhouse dashboard for Home Assistant.
+Dollhouse dashboard card for Home Assistant: day/night sky, sun moving east to west, rooms that light up,
+animated people, plus Energy and Gas from the built-in Energy dashboard.
 
-## Install (2 minutes)
-1. Copy `sweet-floor-card.js` to `/config/www/` (create `www` if missing).
-2. Settings > Dashboards > ⋮ > **Resources** > Add: URL `/local/sweet-floor-card.js?v=1`, type **JavaScript module**.
-   (Enable *Advanced mode* in your profile if you don't see Resources.)
-3. Hard-refresh the browser (Ctrl+Shift+R; on the app: Settings > Companion app > Debugging > Reset frontend cache).
-4. Edit dashboard > Add card > Manual > `type: custom:sweet-floor-card`.
-   Use a **Panel (1 card)** view for full screen.
+## Install
+**Marketplace (Home Assistant 2026.11+):** Settings > Marketplace > Add from link > `YOUR_GITHUB_USER/sweet-floor-card`, type **Dashboard** > Install > reload the browser.
 
-Try it without HA: open `preview.html` in a browser (mock data, time-of-day slider).
+**HACS (older):** Custom repositories, type **Dashboard**, then Download.
 
-## What it does
-- **Day/night** follows `sun.sun` elevation (clock fallback). Sky, house, UI colours fade through dawn/dusk.
-- **Sun** travels east (left) to west (right) using real azimuth/elevation; moon + stars at night; weather rain/snow/clouds.
-- **Rooms light up** for lights (real colour/brightness), TVs (blue flicker) and any other device that is on; the device ring pulses.
-- **People**: avatar glows and ripples in the room with motion/occupancy/presence; header avatars glow when home.
-- **Energy + Gas** use the built-in Energy dashboard (grid, solar, battery, gas, top devices). Gas shows today, this hour, 24h and 7-day charts.
-- Tap a device = toggle; tap a room = controls sheet; long-press = more-info.
+**Manual:** copy `sweet-floor-card.js` to `/config/www/`, add resource `/local/sweet-floor-card.js` (JavaScript module), reload.
 
-## Setup rules
-- Rooms = Areas, floors = Floors. Devices need an Area (entity or its device).
-- Presence needs `binary_sensor` with device class motion/occupancy/presence.
-- Energy: configure Settings > Dashboards > Energy once. The card needs no extra sensors.
-
-## Blank card troubleshooting
-The card now shows an error box instead of nothing. If the area is empty/“Custom element doesn't exist”:
-resource missing or wrong URL (check `/local/...` opens in browser), type not `module`, cache not cleared, or `type:` lacks `custom:`.
+## Use
+```yaml
+type: custom:sweet-floor-card
+title: Sweet Home
+```
+See `dashboard-example.yaml` for all options. Open `preview.html` to try it with mock data.
