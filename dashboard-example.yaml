@@ -1,42 +1,74 @@
-# Minimal: zero config. Rooms come from your Home Assistant Areas/Floors.
+# ==============================================================================
+# Sweet Floor Card - Dashboard Configuration Examples
+# Compatible with both:
+#   type: custom:sweet-floor-card
+#   type: custom:ha-sweet-home
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Minimal: Zero Configuration
+# Areas, floors, and devices are automatically fetched from Home Assistant.
+# ------------------------------------------------------------------------------
 type: custom:sweet-floor-card
 title: Sweet Home
+
 ---
-# Full example (every option is optional)
+
+# ------------------------------------------------------------------------------
+# 2. Recommended Full Configuration
+# Customizes people tracking, scenes, weather, and tabs.
+# ------------------------------------------------------------------------------
 type: custom:sweet-floor-card
 title: Sweet Home
-height: 700                    # px; omit for 680
-weather: weather.home          # default: first weather.* entity
-sun_entity: sun.sun            # drives sun position + day/night
-linger: 90                     # seconds a room stays "occupied" after motion stops
-animations: true
-tabs: [home, energy, climate, security]
+height: 700                           # Card height in pixels (default: 680)
+weather: weather.home                 # Drives sky weather particle effects (rain/snow/clouds)
+sun_entity: sun.sun                   # Drives sun & moon trajectory and day/night cycle
+linger: 90                            # Seconds a room stays occupied after motion ceases
+animations: true                      # Set to false to disable bob and particle animations
+tabs: [home, energy, climate, security] # Tabs to show: home, energy, climate, security
+
 persons:
   - person.alex
   - entity: person.sam
-    area_sensor: sensor.sam_phone_area   # optional (Bermuda / ESPresense): puts the avatar in the exact room
-modes:                         # chips on the Home tab (scene, script, button, switch, input_boolean)
+    area_sensor: sensor.sam_phone_area # Optional Bermuda / ESPresense area sensor
+
+modes:                                # Quick action chips on the Home tab glance bar
   - entity: scene.movie_night
-    name: Movie night
+    name: Movie Night
     icon: 🎬
-exclude: [light.some_group]    # entities to hide from the plan
-# Energy + Gas are read from Settings > Dashboards > Energy automatically.
-# Only add this block if you want to override or fill gaps:
+  - entity: script.bedtime
+    name: Bedtime
+    icon: 🌙
+
+exclude:                              # Entities to hide from the floor plan
+  - light.all_lights_group
+
+# Energy & Gas are read automatically from Settings > Dashboards > Energy.
+# Only specify this block if you want to override or fill missing sensors:
 energy:
   grid_power: sensor.grid_power          # W or kW, + = import, - = export
-  # grid_power_invert: true              # if your sensor has the opposite sign
-  solar_power: sensor.solar_power
-  battery_power: sensor.battery_power    # + = discharging
-  home_power: sensor.house_power
-  grid_import: sensor.grid_import_energy # kWh meters (statistics ids)
-  grid_export: sensor.grid_export_energy
-  solar_energy: sensor.solar_energy
+  # grid_power_invert: true              # Set true if your sensor reports inverted sign
+  solar_power: sensor.solar_power        # W or kW
+  battery_power: sensor.battery_power    # W or kW (+ = discharging, - = charging)
+  home_power: sensor.house_power         # Optional: total home power
+  grid_import: sensor.grid_import_energy # kWh meter (statistics id)
+  grid_export: sensor.grid_export_energy # kWh meter (statistics id)
+  solar_energy: sensor.solar_energy      # kWh meter (statistics id)
   gas: sensor.gas_meter                  # m³, ft³ or kWh meter
+
 ---
-# Optional: manual layout instead of auto (units are grid cells, a room is ~4 x 3.4)
+
+# ------------------------------------------------------------------------------
+# 3. Optional: Custom Manual Room Layout
+# Units are grid cells; a standard room is ~4 x 3.4
+# ------------------------------------------------------------------------------
 type: custom:sweet-floor-card
+title: Sweet Home
 rooms:
-  - { area: living_room, x: 0, y: 0, w: 6, h: 4 }
-  - { area: kitchen,     x: 6, y: 0, w: 4, h: 4 }
-  - { area: bedroom,     x: 0, y: 4, w: 5, h: 3.4, floor: upstairs }
-    # devices: { light.bedside: {x: 0.2, y: 0.3} }   # place a device (0..1 inside the room)
+  - { area: living_room, x: 0, y: 0, w: 6, h: 4, floor: ground }
+  - { area: kitchen,     x: 6, y: 0, w: 4, h: 4, floor: ground }
+  - { area: hallway,     x: 0, y: 4, w: 3, h: 3, floor: ground }
+  - { area: office,      x: 3, y: 4, w: 3, h: 3, floor: ground }
+  - { area: bedroom,     x: 0, y: 0, w: 5, h: 3.4, floor: upstairs }
+  - { area: kids,        x: 5, y: 0, w: 4, h: 3.4, floor: upstairs }
+  - { area: bathroom,    x: 0, y: 3.4, w: 4, h: 3.4, floor: upstairs }

@@ -5,9 +5,8 @@
  */
 (function () {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var TAG = 'sweet-floor-card';
-  if (window.customElements.get(TAG)) return;
 
   /* ======================================================================
    * Small helpers
@@ -138,11 +137,26 @@
     var b = num(st.attributes && st.attributes.brightness);
     return b == null ? 1 : clamp(b / 255, 0.08, 1);
   }
+  function hsToRGB(h, s) {
+    var c = s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = 1 - c;
+    var r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else { r = c; b = x; }
+    return [clamp((r + m) * 255, 0, 255), clamp((g + m) * 255, 0, 255), clamp((b + m) * 255, 0, 255)];
+  }
+
   function lightRGB(st) {
     var a = st.attributes || {};
-    if (a.color_mode === 'color_temp' && num(a.color_temp_kelvin)) return mixA(kelvinRGB(a.color_temp_kelvin), [255, 200, 130], 0.25);
     if (Array.isArray(a.rgb_color) && a.rgb_color.length >= 3) return [a.rgb_color[0], a.rgb_color[1], a.rgb_color[2]];
-    if (num(a.color_temp_kelvin)) return mixA(kelvinRGB(a.color_temp_kelvin), [255, 200, 130], 0.25);
+    var k = num(a.color_temp_kelvin) || (num(a.color_temp) ? Math.round(1000000 / a.color_temp) : null);
+    if (k) return mixA(kelvinRGB(k), [255, 200, 130], 0.25);
+    if (Array.isArray(a.hs_color) && a.hs_color.length >= 2) {
+      return hsToRGB(a.hs_color[0], a.hs_color[1] / 100);
+    }
     return [255, 214, 150];
   }
   function accentFor(kind, st) {
@@ -238,10 +252,64 @@
   }
 
   /* ======================================================================
+   * WebSocket Registries & Smart Room Inferrer
+   * ==================================================================== */
+  function fetchRegistries(hass) {
+    if (!hass || typeof hass.callWS !== 'function') return Promise.resolve(null);
+    var pA = hass.callWS({ type: 'config/area_registry/list' }).catch(function () { return []; });
+    var pD = hass.callWS({ type: 'config/device_registry/list' }).catch(function () { return []; });
+    var pE = hass.callWS({ type: 'config/entity_registry/list' }).catch(function () { return []; });
+    var pF = hass.callWS({ type: 'config/floor_registry/list' }).catch(function () { return []; });
+    return Promise.all([pA, pD, pE, pF]).then(function (res) {
+      var areas = {}, devices = {}, entities = {}, floors = {};
+      (res[0] || []).forEach(function (a) { if (a && a.area_id) areas[a.area_id] = a; });
+      (res[1] || []).forEach(function (d) { if (d && d.id) devices[d.id] = d; });
+      (res[2] || []).forEach(function (e) { if (e && e.entity_id) entities[e.entity_id] = e; });
+      (res[3] || []).forEach(function (f) { if (f && f.floor_id) floors[f.floor_id] = f; });
+      return { areas: areas, devices: devices, entities: entities, floors: floors };
+    });
+  }
+
+  var ROOM_KEYWORDS = [
+    'living_room', 'living', 'kitchen', 'bedroom', 'master_bedroom', 'office', 'study',
+    'hallway', 'hall', 'corridor', 'bathroom', 'bath', 'toilet', 'garage', 'dining_room',
+    'dining', 'basement', 'patio', 'garden', 'attic', 'laundry', 'kids_room', 'nursery',
+    'guest_room', 'balcony', 'porch'
+  ];
+
+  function formatAreaName(s) {
+    if (!s) return 'Room';
+    return String(s)
+      .replace(/[._-]+/g, ' ')
+      .replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function inferArea(id, st) {
+    var name = (id + ' ' + (st && st.attributes && st.attributes.friendly_name ? st.attributes.friendly_name : '')).toLowerCase();
+    for (var i = 0; i < ROOM_KEYWORDS.length; i++) {
+      var kw = ROOM_KEYWORDS[i];
+      var re = new RegExp('(^|[._\\s])' + kw + '([._\\s]|$)', 'i');
+      if (re.test(name)) {
+        if (kw === 'living') return 'living_room';
+        if (kw === 'hall' || kw === 'corridor') return 'hallway';
+        if (kw === 'bath' || kw === 'toilet') return 'bathroom';
+        if (kw === 'dining') return 'dining_room';
+        if (kw === 'study') return 'office';
+        return kw;
+      }
+    }
+    return null;
+  }
+  /* ======================================================================
    * Room model (auto from HA areas, or manual `rooms:`)
    * ==================================================================== */
-  function buildModel(hass, cfg) {
-    var S = hass.states, reg = hass.entities || {}, dreg = hass.devices || {}, areas = hass.areas || {}, floors = hass.floors || {};
+  function buildModel(hass, cfg, registries) {
+    var S = hass.states;
+    var regs = registries || window.__ha_registries || {};
+    var reg = regs.entities || hass.entities || {};
+    var dreg = regs.devices || hass.devices || {};
+    var areas = regs.areas || hass.areas || {};
+    var floors = regs.floors || hass.floors || {};
     var exclude = {};
     (cfg.exclude || []).forEach(function (e) { exclude[e] = 1; });
 
@@ -269,20 +337,47 @@
         var a = r.area;
         rooms.push({
           id: String(r.id || a || 'room' + i),
-          name: r.name || (a && areas[a] && areas[a].name) || a || 'Room ' + (i + 1),
+          name: r.name || (a && areas[a] && areas[a].name) || (a ? formatAreaName(a) : 'Room ' + (i + 1)),
           area: a, floor: r.floor != null ? String(r.floor) : '_',
           x: num(r.x), y: num(r.y), w: num(r.w), h: num(r.h),
           extra: r.entities || [], devPos: r.devices || {}
         });
       });
-    } else {
+    } else if (Object.keys(areas).length > 0) {
       var ids = Object.keys(areas);
       if (Array.isArray(cfg.areas) && cfg.areas.length) ids = ids.filter(function (a) { return cfg.areas.indexOf(a) >= 0; });
       ids.forEach(function (a) {
-        rooms.push({ id: a, name: areas[a].name || a, area: a, floor: areas[a].floor_id || '_', extra: [], devPos: {} });
+        rooms.push({
+          id: a, name: (areas[a] && areas[a].name) || formatAreaName(a),
+          area: a, floor: (areas[a] && areas[a].floor_id) || '_',
+          extra: [], devPos: {}
+        });
       });
-      if (!rooms.length) {
-        // No areas known: still show something useful
+    } else {
+      // Smart Fallback: Infer areas from entity names
+      var inferred = {};
+      unassigned.forEach(function (id) {
+        var ia = inferArea(id, S[id]);
+        if (ia) {
+          (inferred[ia] = inferred[ia] || []).push(id);
+        }
+      });
+      var infKeys = Object.keys(inferred);
+      if (infKeys.length > 0) {
+        infKeys.forEach(function (ia) {
+          rooms.push({
+            id: ia,
+            name: formatAreaName(ia),
+            area: ia,
+            floor: (ia.indexOf('bed') >= 0 || ia.indexOf('bath') >= 0 || ia.indexOf('kids') >= 0) ? 'upstairs' : 'ground',
+            extra: inferred[ia],
+            devPos: {}
+          });
+        });
+        var inferredSet = {};
+        infKeys.forEach(function(k) { inferred[k].forEach(function(x) { inferredSet[x] = 1; }); });
+        unassigned = unassigned.filter(function(x) { return !inferredSet[x]; });
+      } else {
         rooms.push({ id: '_home', name: cfg.title || 'Home', area: null, floor: '_', extra: unassigned.slice(0, 12), devPos: {}, fallback: true });
       }
     }
@@ -442,11 +537,17 @@
       var sp = findP(/solar|pv|photovolt|inverter|generation|production/, /battery/);
       if (sp) { o.solar.power.push({ id: sp.id, sign: 1 }); o.auto.push(sp.id); }
     }
+    if (!o.battery.power.length) {
+      var bp = findP(/battery.*power|powerwall.*power|storage.*power/, /grid|solar/);
+      if (bp) { o.battery.power.push({ id: bp.id, sign: 1 }); o.auto.push(bp.id); }
+    }
     if (!o.gas.energy.length) {
       var gs = ents.filter(function (e) {
-        var gasUnit = ['m³', 'm3', 'ft³', 'ft3', 'CCF', 'MCF', 'hcf'].indexOf(e.unit) >= 0;
-        return (e.dc === 'gas' && (e.sc === 'total' || e.sc === 'total_increasing')) ||
-          (gasUnit && /gas/.test(e.name) && e.sc) || (e.dc === 'energy' && /gas/.test(e.name) && e.sc);
+        var u = (e.unit || '').toLowerCase();
+        var gasUnit = ['m³', 'm3', 'ft³', 'ft3', 'ccf', 'mcf', 'hcf', 'therms', 'therm'].indexOf(u) >= 0;
+        return (e.dc === 'gas') ||
+          (gasUnit && /gas/i.test(e.name)) ||
+          (/gas/i.test(e.name) && (e.dc === 'energy' || gasUnit || e.sc || /meter|consum|total/i.test(e.name)));
       })[0];
       if (gs) { o.gas.energy.push(gs.id); o.auto.push(gs.id); }
     }
@@ -782,7 +883,25 @@
     }
 
     set hass(hass) {
+      var self = this;
       this._hass = hass;
+      if (!this._registries) {
+        if (window.__ha_registries) {
+          this._registries = window.__ha_registries;
+        } else if (hass && typeof hass.callWS === 'function' && !this._fetchingReg) {
+          this._fetchingReg = true;
+          fetchRegistries(hass).then(function (regs) {
+            self._fetchingReg = false;
+            if (regs && (Object.keys(regs.areas).length > 0 || Object.keys(regs.entities).length > 0)) {
+              self._registries = window.__ha_registries = regs;
+              if (self._built) {
+                self._built = false;
+                self._init();
+              }
+            }
+          }).catch(function () { self._fetchingReg = false; });
+        }
+      }
       try { this._onHass(); } catch (e) { this._fail(e); }
     }
     get hass() { return this._hass; }
@@ -794,6 +913,19 @@
     connectedCallback() {
       var self = this;
       this._disconnect();
+      if (!this._registries && this._hass && typeof this._hass.callWS === 'function' && !this._fetchingReg) {
+        this._fetchingReg = true;
+        fetchRegistries(this._hass).then(function (regs) {
+          self._fetchingReg = false;
+          if (regs && (Object.keys(regs.areas).length > 0 || Object.keys(regs.entities).length > 0)) {
+            self._registries = window.__ha_registries = regs;
+            if (self._built) {
+              self._built = false;
+              self._init();
+            }
+          }
+        }).catch(function () { self._fetchingReg = false; });
+      }
       this._timers.push(setInterval(function () {
         if (!self._hass || !self._built) return;
         try { self._update(); } catch (e) { self._fail(e); }
@@ -828,7 +960,8 @@
       var h = this._hass, k = this._mk;
       if (!k) return true;
       if (k.n !== Object.keys(h.states).length) return true;
-      var cur = [h.entities, h.areas, h.devices, h.floors];
+      var regs = this._registries || window.__ha_registries || {};
+      var cur = [regs.entities || h.entities, regs.areas || h.areas, regs.devices || h.devices, regs.floors || h.floors];
       for (var i = 0; i < 4; i++) if (k.o[i] !== cur[i]) return true;
       return false;
     }
@@ -863,8 +996,9 @@
     /* ----------------------------------------------------------------- init */
     _init() {
       var hass = this._hass, cfg = this._config;
-      this._mk = { n: Object.keys(hass.states).length, o: [hass.entities, hass.areas, hass.devices, hass.floors] };
-      this._model = buildModel(hass, cfg);
+      var regs = this._registries || window.__ha_registries || {};
+      this._mk = { n: Object.keys(hass.states).length, o: [regs.entities || hass.entities, regs.areas || hass.areas, regs.devices || hass.devices, regs.floors || hass.floors] };
+      this._model = buildModel(hass, cfg, this._registries);
 
       // persons
       var pl = cfg.persons;
@@ -1614,9 +1748,26 @@
       var ids = en.src.gas.energy; if (!ids.length) return null;
       var S = this._hass.states, stats = en.stats, unit = unitOf(stats, S, ids[0]) || 'm³';
       var hours = stats && stats.ok ? sumHours(stats, S, ids, false) : null;
-      var v = hours ? hours.reduce(function (a, b) { return a + b; }, 0) : baselineToday(S, ids, false, stats);
+      var v = null, est = false;
+      if (hours) {
+        v = hours.reduce(function (a, b) { return a + b; }, 0);
+      } else {
+        v = baselineToday(S, ids, false, stats);
+        est = true;
+      }
+      if (v == null || v === 0) {
+        var s0 = S[ids[0]];
+        if (s0 && /today|daily|day/i.test(ids[0])) {
+          var direct = num(s0.state);
+          if (direct != null && direct > 0) { v = direct; est = false; }
+        }
+      }
       var curH = new Date().getHours();
-      return { v: v, unit: unit, hours: hours, est: !hours, thisHour: hours ? hours[curH] : null, lastHour: hours ? hours[(curH + 23) % 24] : null };
+      return {
+        v: v, unit: unit, hours: hours, est: est,
+        thisHour: hours ? hours[curH] : null,
+        lastHour: hours ? hours[(curH + 23) % 24] : null
+      };
     }
 
     _renderEnergyLive() {
@@ -1643,11 +1794,12 @@
       set('.node.gas .nl', gas && gas.thisHour != null ? 'This hour ' + fmt(gas.thisHour, 3) : 'Gas today');
       node('solar', pn.solar != null && pn.solar > thr); node('grid', pn.grid != null && Math.abs(pn.grid) > thr);
       node('battery', pn.battery != null && Math.abs(pn.battery) > thr);
-      node('home', pn.home != null && pn.home > thr); node('gas', !!(gas && gas.thisHour > 0));
+      var gasActive = !!(gas && (gas.thisHour > 0 || (gas.v != null && gas.v > 0)));
+      node('home', pn.home != null && pn.home > thr); node('gas', gasActive);
       flow('f-solar', pn.solar != null && pn.solar > thr, false, pn.solar);
       flow('f-grid', pn.grid != null && Math.abs(pn.grid) > thr, pn.grid != null && pn.grid < 0, pn.grid);
       flow('f-batt', pn.battery != null && Math.abs(pn.battery) > thr, pn.battery != null && pn.battery < 0, pn.battery);
-      flow('f-gas', !!(gas && gas.thisHour > 0), false, 400);
+      flow('f-gas', gasActive, false, 400);
       var vis = function (sel, on) { var el = page.querySelector(sel); if (el) el.style.display = on ? '' : 'none'; };
       vis('.node.solar', src.solar.power.length > 0 || src.solar.energy.length > 0); vis('.pf-solar', src.solar.power.length > 0 || src.solar.energy.length > 0);
       vis('.node.battery', src.battery.power.length > 0 || src.battery.from.length > 0); vis('.pf-batt', src.battery.power.length > 0 || src.battery.from.length > 0);
@@ -1762,11 +1914,27 @@
     return t + ' · ' + phase;
   }
 
-  window.customElements.define(TAG, SweetFloorCard);
-  window.customCards = window.customCards || [];
-  window.customCards.push({
-    type: TAG, name: 'Sweet Floor', preview: false,
-    description: 'Dollhouse floor plan with day/night sky, moving sun, lit rooms, live presence and Energy + Gas.'
+  var ALIASES = ['sweet-floor-card', 'ha-sweet-home', 'sweet-home-card', 'sweet-floor', 'next-floor-card'];
+  ALIASES.forEach(function (tag) {
+    if (!window.customElements.get(tag)) {
+      window.customElements.define(tag, SweetFloorCard);
+    }
   });
+
+  window.customCards = window.customCards || [];
+  if (!window.customCards.some(function (c) { return c.type === 'sweet-floor-card'; })) {
+    window.customCards.push({
+      type: 'sweet-floor-card',
+      name: 'Sweet Floor Card',
+      preview: true,
+      description: 'Dollhouse floor plan with day/night sky, moving sun, lit rooms, live presence and Energy + Gas.'
+    });
+    window.customCards.push({
+      type: 'ha-sweet-home',
+      name: 'Sweet Home (Sweet Floor)',
+      preview: true,
+      description: 'Dollhouse floor plan with day/night sky, moving sun, lit rooms, live presence and Energy + Gas.'
+    });
+  }
   console.info('%c SWEET-FLOOR-CARD %c v' + VERSION + ' ', 'background:#27364f;color:#fff;border-radius:3px 0 0 3px;padding:2px 4px', 'background:#ffc566;color:#222;border-radius:0 3px 3px 0;padding:2px 4px');
 })();

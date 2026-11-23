@@ -5,22 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sweet Floor – offline preview (mock Home Assistant)</title>
 <style>
-  html,body{margin:0;background:#1b1f27;color:#dfe6f2;font-family:system-ui,sans-serif}
-  .wrap{max-width:980px;margin:0 auto;padding:12px}
-  .bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px;font-size:14px}
-  .bar input[type=range]{width:260px}
-  .bar button{padding:6px 10px;border-radius:8px;border:0;background:#3a4560;color:#fff;cursor:pointer}
+  html,body{margin:0;background:#151820;color:#dfe6f2;font-family:system-ui,-apple-system,sans-serif}
+  .wrap{max-width:1040px;margin:0 auto;padding:16px}
+  .header-info{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1)}
+  .header-info h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-0.02em}
+  .header-info .desc{font-size:13px;opacity:.7}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;background:rgba(255,255,255,0.05);padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,0.08);font-size:13px}
+  .bar label{display:flex;align-items:center;gap:8px;font-weight:600}
+  .bar input[type=range]{width:200px;accent-color:#4e9af7;cursor:pointer}
+  .bar button{padding:7px 12px;border-radius:8px;border:0;background:#2d3748;color:#fff;cursor:pointer;font-weight:600;font-size:13px;transition:all .2s;display:flex;align-items:center;gap:6px}
+  .bar button:hover{background:#3f4d66;transform:translateY(-1px)}
+  .bar button:active{transform:translateY(0)}
+  .bar button.active{background:#2b6cb0;box-shadow:0 0 10px rgba(78,154,247,0.5)}
+  .badge{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;background:rgba(78,154,247,0.2);color:#90cdf4}
   ha-card{display:block}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div class="header-info">
+    <div>
+      <h1>🏡 Sweet Floor Card – Live HA Simulation</h1>
+      <div class="desc">A blend of Sweet-Home layout and NextFloor 3D depth: moving sun (East to West), lit rooms & TVs, animated presence, and Energy + Gas.</div>
+    </div>
+    <span class="badge">HA 2026.11+ Ready</span>
+  </div>
+
   <div class="bar">
-    <label>Time of day <input id="hr" type="range" min="0" max="23.9" step="0.1" value="13"> <b id="hrv">13:00</b></label>
-    <button id="live">Use real sun.sun</button>
-    <button id="mv">Move person to next room</button>
-    <button id="tvb">Toggle living-room TV</button>
-    <span style="opacity:.6">Mock data only. Nothing here talks to a real Home Assistant.</span>
+    <label>☀️ Sun & Time: <input id="hr" type="range" min="0" max="23.9" step="0.1" value="13"> <b id="hrv">13:00</b></label>
+    <button id="play">▶ Play Sun (East→West)</button>
+    <button id="live">Real sun.sun</button>
+    <button id="mv">🧍 Move Person (Presence)</button>
+    <button id="tvb">📺 Toggle TV</button>
+    <button id="ltb">💡 Toggle Lights</button>
+    <button id="gasb">🔥 Boost Gas Flow</button>
   </div>
   <div id="host"></div>
 </div>
@@ -48,14 +66,14 @@
   const states = {}; const entities = {};
   const add = (id, state, attrs, area) => { states[id] = mk(id, state, attrs); entities[id] = { entity_id: id, area_id: area || null, device_id: null, hidden: false, entity_category: null }; };
 
-  add('light.living_room_ceiling', 'on', { brightness: 200, color_mode: 'color_temp', color_temp_kelvin: 2700, supported_color_modes: ['color_temp'] }, 'living_room');
+  add('light.living_room_ceiling', 'on', { brightness: 210, color_mode: 'color_temp', color_temp_kelvin: 2800, supported_color_modes: ['color_temp'] }, 'living_room');
   add('light.living_room_lamp', 'off', { supported_color_modes: ['rgb'] }, 'living_room');
-  add('media_player.living_room_tv', 'off', { device_class: 'tv' }, 'living_room');
+  add('media_player.living_room_tv', 'on', { device_class: 'tv', media_title: 'Interstellar', app_name: 'Netflix' }, 'living_room');
   add('media_player.living_room_speaker', 'off', { device_class: 'speaker' }, 'living_room');
-  add('binary_sensor.living_room_motion', 'off', { device_class: 'motion' }, 'living_room');
-  add('sensor.living_room_temperature', '21.4', { device_class: 'temperature', unit_of_measurement: '°C' }, 'living_room');
-  add('sensor.living_room_humidity', '46', { device_class: 'humidity', unit_of_measurement: '%' }, 'living_room');
-  add('climate.living_room_ac', 'heat', { hvac_action: 'heating', current_temperature: 21.4, temperature: 22 }, 'living_room');
+  add('binary_sensor.living_room_motion', 'on', { device_class: 'motion' }, 'living_room');
+  add('sensor.living_room_temperature', '21.8', { device_class: 'temperature', unit_of_measurement: '°C' }, 'living_room');
+  add('sensor.living_room_humidity', '48', { device_class: 'humidity', unit_of_measurement: '%' }, 'living_room');
+  add('climate.living_room_ac', 'heat', { hvac_action: 'heating', current_temperature: 21.8, temperature: 22 }, 'living_room');
   add('cover.living_room_blinds', 'open', { current_position: 100 }, 'living_room');
   add('binary_sensor.living_room_window', 'off', { device_class: 'window' }, 'living_room');
 
@@ -63,7 +81,7 @@
   add('light.kitchen_strip', 'off', { supported_color_modes: ['rgb'] }, 'kitchen');
   add('switch.kitchen_coffee_machine', 'off', { device_class: 'outlet' }, 'kitchen');
   add('binary_sensor.kitchen_motion', 'off', { device_class: 'motion' }, 'kitchen');
-  add('sensor.kitchen_temperature', '22.8', { device_class: 'temperature', unit_of_measurement: '°C' }, 'kitchen');
+  add('sensor.kitchen_temperature', '22.5', { device_class: 'temperature', unit_of_measurement: '°C' }, 'kitchen');
 
   add('light.hallway', 'off', { supported_color_modes: ['onoff'] }, 'hallway');
   add('binary_sensor.hallway_motion', 'off', { device_class: 'motion' }, 'hallway');
@@ -83,28 +101,28 @@
   add('light.bedroom_bedside', 'off', { supported_color_modes: ['rgb'] }, 'bedroom');
   add('media_player.bedroom_tv', 'off', { device_class: 'tv' }, 'bedroom');
   add('binary_sensor.bedroom_motion', 'off', { device_class: 'motion' }, 'bedroom');
-  add('sensor.bedroom_temperature', '19.9', { device_class: 'temperature', unit_of_measurement: '°C' }, 'bedroom');
+  add('sensor.bedroom_temperature', '20.0', { device_class: 'temperature', unit_of_measurement: '°C' }, 'bedroom');
   add('light.kids_ceiling', 'off', { supported_color_modes: ['brightness'] }, 'kids');
   add('switch.kids_night_light', 'off', {}, 'kids');
   add('light.bathroom_mirror', 'off', { supported_color_modes: ['onoff'] }, 'bathroom');
   add('fan.bathroom_extractor', 'off', {}, 'bathroom');
-  add('sensor.bathroom_humidity', '68', { device_class: 'humidity', unit_of_measurement: '%' }, 'bathroom');
+  add('sensor.bathroom_humidity', '64', { device_class: 'humidity', unit_of_measurement: '%' }, 'bathroom');
 
   add('person.alex', 'home', { friendly_name: 'Alex Morgan' });
-  add('person.sam', 'not_home', { friendly_name: 'Sam Lee' });
+  add('person.sam', 'home', { friendly_name: 'Sam Lee' });
   add('sun.sun', 'above_horizon', { elevation: 48, azimuth: 180 });
-  add('weather.home', params.get('wx') || 'sunny', { temperature: 17, temperature_unit: '°C' });
+  add('weather.home', params.get('wx') || 'sunny', { temperature: 18, temperature_unit: '°C' });
 
-  // energy sensors
-  add('sensor.grid_power', '640', { device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' });
-  add('sensor.solar_power', '2.35', { device_class: 'power', unit_of_measurement: 'kW', state_class: 'measurement' });
-  add('sensor.battery_power', '-300', { device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' });
+  // Built-in energy sensors
+  add('sensor.grid_power', '580', { device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' });
+  add('sensor.solar_power', '2.65', { device_class: 'power', unit_of_measurement: 'kW', state_class: 'measurement' });
+  add('sensor.battery_power', '-350', { device_class: 'power', unit_of_measurement: 'W', state_class: 'measurement' });
   add('sensor.grid_import_energy', '12034.5', { device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' });
   add('sensor.grid_export_energy', '3340.1', { device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' });
   add('sensor.solar_energy', '5201.0', { device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' });
   add('sensor.gas_meter', '1832.44', { device_class: 'gas', unit_of_measurement: 'm³', state_class: 'total_increasing' });
-  add('sensor.dishwasher_energy', '88', { device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' });
-  add('sensor.heat_pump_energy', '410', { device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' });
+  add('sensor.dishwasher_energy', '88.4', { device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' });
+  add('sensor.heat_pump_energy', '412.0', { device_class: 'energy', unit_of_measurement: 'kWh', state_class: 'total_increasing' });
 
   const hass = {
     states, entities, devices: {}, areas, floors,
@@ -125,6 +143,10 @@
     },
     callWS(msg) {
       hass.calls.push(['ws', msg.type, msg]);
+      if (msg.type === 'config/area_registry/list') return Promise.resolve(Object.values(areas));
+      if (msg.type === 'config/floor_registry/list') return Promise.resolve(Object.values(floors));
+      if (msg.type === 'config/device_registry/list') return Promise.resolve([]);
+      if (msg.type === 'config/entity_registry/list') return Promise.resolve(Object.values(entities));
       if (msg.type === 'energy/get_prefs') {
         return Promise.resolve({
           energy_sources: [
@@ -133,7 +155,7 @@
             { type: 'battery', stat_energy_from: 'sensor.x', stat_energy_to: 'sensor.y', stat_rate: 'sensor.battery_power' },
             { type: 'gas', stat_energy_from: 'sensor.gas_meter' }
           ],
-          device_consumption: [{ stat_consumption: 'sensor.dishwasher_energy' }, { stat_consumption: 'sensor.heat_pump_energy' }]
+          device_consumption: [{ stat_consumption: 'sensor.dishwasher_energy', name: 'Dishwasher' }, { stat_consumption: 'sensor.heat_pump_energy', name: 'Heat pump' }]
         });
       }
       if (msg.type === 'recorder/get_statistics_metadata') {
@@ -141,24 +163,24 @@
       }
       if (msg.type === 'recorder/statistics_during_period') {
         const out = {}; const hrNow = new Date().getHours();
-        msg.statistic_ids.forEach((id, k) => {
+        msg.statistic_ids.forEach((id) => {
           const arr = [];
           if (msg.period === 'hour') {
             for (let h = 0; h <= hrNow; h++) {
               const t = new Date(); t.setHours(h, 0, 0, 0);
               let v;
-              if (id.indexOf('gas') >= 0) v = (h >= 6 && h <= 9) || (h >= 17 && h <= 21) ? 0.35 + (h % 3) * 0.1 : 0.04;
-              else if (id.indexOf('solar') >= 0) v = Math.max(0, Math.sin(Math.PI * (h - 6) / 12)) * 2.2;
-              else if (id.indexOf('export') >= 0) v = Math.max(0, Math.sin(Math.PI * (h - 8) / 8)) * 0.8;
-              else if (id.indexOf('dishwasher') >= 0) v = h === 14 ? 0.9 : 0.01;
-              else if (id.indexOf('heat_pump') >= 0) v = 0.3 + (h % 4) * 0.15;
+              if (id.indexOf('gas') >= 0) v = (h >= 6 && h <= 9) || (h >= 17 && h <= 21) ? 0.38 + (h % 3) * 0.12 : 0.05;
+              else if (id.indexOf('solar') >= 0) v = Math.max(0, Math.sin(Math.PI * (h - 6) / 12)) * 2.4;
+              else if (id.indexOf('export') >= 0) v = Math.max(0, Math.sin(Math.PI * (h - 8) / 8)) * 0.9;
+              else if (id.indexOf('dishwasher') >= 0) v = h === 14 ? 0.95 : 0.01;
+              else if (id.indexOf('heat_pump') >= 0) v = 0.35 + (h % 4) * 0.15;
               else v = 0.3 + ((h * 7) % 5) * 0.12;
               arr.push({ start: t.getTime(), end: t.getTime() + 3600000, change: v });
             }
           } else {
             for (let d = 6; d >= 0; d--) {
               const t = new Date(); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() - d);
-              const base = id.indexOf('gas') >= 0 ? 3.2 : id.indexOf('solar') >= 0 ? 9 : 10;
+              const base = id.indexOf('gas') >= 0 ? 3.4 : id.indexOf('solar') >= 0 ? 9.2 : 10.5;
               arr.push({ start: t.getTime(), end: t.getTime() + 86400000, change: base + ((d * 13) % 5) * 0.8 });
             }
           }
@@ -173,11 +195,11 @@
   const host = document.getElementById('host');
   const card = document.createElement('sweet-floor-card');
   const baseCfg = {
-    title: 'Sweet Home', modes: ['scene.movie_night'],
+    title: 'Sweet Home', modes: [{ entity: 'scene.movie_night', name: 'Movie Night', icon: '🎬' }],
     persons: ['person.alex', 'person.sam'],
     preview_hour: params.get('hour') ? parseFloat(params.get('hour')) : 13
   };
-  states['scene.movie_night'] = mk('scene.movie_night', 'unknown', {});
+  states['scene.movie_night'] = mk('scene.movie_night', 'unknown', { friendly_name: 'Movie Night' });
   card.setConfig(baseCfg);
   host.appendChild(card);
   const push = () => { card.hass = Object.assign({}, hass, { states: Object.assign({}, states) }); };
@@ -188,15 +210,59 @@
   hr.value = baseCfg.preview_hour; hrv.textContent = fmtH(baseCfg.preview_hour);
   hr.addEventListener('input', () => { hrv.textContent = fmtH(+hr.value); card.setConfig(Object.assign({}, baseCfg, { preview_hour: +hr.value })); });
   document.getElementById('live').onclick = () => { const c = Object.assign({}, baseCfg); delete c.preview_hour; card.setConfig(c); };
-  const rooms = ['living_room', 'kitchen', 'hallway', 'office']; let ri = 0;
+
+  // Sun Cycle Player (East to West progression)
+  let playTimer = null;
+  const playBtn = document.getElementById('play');
+  playBtn.onclick = () => {
+    if (playTimer) {
+      clearInterval(playTimer);
+      playTimer = null;
+      playBtn.textContent = '▶ Play Sun (East→West)';
+      playBtn.classList.remove('active');
+      return;
+    }
+    playBtn.textContent = '⏸ Pause Cycle';
+    playBtn.classList.add('active');
+    playTimer = setInterval(() => {
+      let v = (+hr.value + 0.15);
+      if (v >= 24) v = 0;
+      hr.value = v.toFixed(1);
+      hrv.textContent = fmtH(v);
+      card.setConfig(Object.assign({}, baseCfg, { preview_hour: v }));
+    }, 120);
+  };
+
+  // Move Person (trigger motion & avatar presence)
+  const rooms = ['living_room', 'kitchen', 'hallway', 'office', 'bedroom']; let ri = 0;
   document.getElementById('mv').onclick = () => {
     rooms.forEach(r => { const id = Object.keys(states).filter(k => k.indexOf('binary_sensor.' + r) === 0 && /motion|presence/.test(k))[0]; if (id) states[id] = Object.assign({}, states[id], { state: 'off', last_changed: new Date(Date.now() - 600000).toISOString() }); });
     ri = (ri + 1) % rooms.length;
-    const id = Object.keys(states).filter(k => k.indexOf('binary_sensor.' + rooms[ri]) === 0 && /motion|presence/.test(k))[0];
+    const targetRoom = rooms[ri];
+    const id = Object.keys(states).filter(k => k.indexOf('binary_sensor.' + targetRoom) === 0 && /motion|presence/.test(k))[0];
     if (id) states[id] = Object.assign({}, states[id], { state: 'on', last_changed: nowIso() });
     push();
   };
+
+  // Toggle TV (triggers room illumination and TV screen glow)
   document.getElementById('tvb').onclick = () => hass.callService('media_player', 'toggle', { entity_id: 'media_player.living_room_tv' });
+
+  // Toggle Lights (ceiling & kitchen)
+  document.getElementById('ltb').onclick = () => {
+    const s = states['light.living_room_ceiling'];
+    const next = s.state === 'on' ? 'off' : 'on';
+    hass.callService('light', next === 'on' ? 'turn_on' : 'turn_off', { entity_id: 'light.living_room_ceiling' });
+    hass.callService('light', next === 'on' ? 'turn_on' : 'turn_off', { entity_id: 'light.kitchen_main' });
+  };
+
+  // Simulate Gas usage boost
+  let gasBoost = false;
+  document.getElementById('gasb').onclick = () => {
+    gasBoost = !gasBoost;
+    const curVal = parseFloat(states['sensor.gas_meter'].state);
+    states['sensor.gas_meter'] = Object.assign({}, states['sensor.gas_meter'], { state: (curVal + (gasBoost ? 0.35 : 0.05)).toFixed(2) });
+    push();
+  };
 
   window.__sf = { hass, card, states, push, mk, baseCfg };
 })();
