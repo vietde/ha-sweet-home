@@ -1,0 +1,42 @@
+# Minimal: zero config. Rooms come from your Home Assistant Areas/Floors.
+type: custom:sweet-floor-card
+title: Sweet Home
+---
+# Full example (every option is optional)
+type: custom:sweet-floor-card
+title: Sweet Home
+height: 700                    # px; omit for 680
+weather: weather.home          # default: first weather.* entity
+sun_entity: sun.sun            # drives sun position + day/night
+linger: 90                     # seconds a room stays "occupied" after motion stops
+animations: true
+tabs: [home, energy, climate, security]
+persons:
+  - person.alex
+  - entity: person.sam
+    area_sensor: sensor.sam_phone_area   # optional (Bermuda / ESPresense): puts the avatar in the exact room
+modes:                         # chips on the Home tab (scene, script, button, switch, input_boolean)
+  - entity: scene.movie_night
+    name: Movie night
+    icon: 🎬
+exclude: [light.some_group]    # entities to hide from the plan
+# Energy + Gas are read from Settings > Dashboards > Energy automatically.
+# Only add this block if you want to override or fill gaps:
+energy:
+  grid_power: sensor.grid_power          # W or kW, + = import, - = export
+  # grid_power_invert: true              # if your sensor has the opposite sign
+  solar_power: sensor.solar_power
+  battery_power: sensor.battery_power    # + = discharging
+  home_power: sensor.house_power
+  grid_import: sensor.grid_import_energy # kWh meters (statistics ids)
+  grid_export: sensor.grid_export_energy
+  solar_energy: sensor.solar_energy
+  gas: sensor.gas_meter                  # m³, ft³ or kWh meter
+---
+# Optional: manual layout instead of auto (units are grid cells, a room is ~4 x 3.4)
+type: custom:sweet-floor-card
+rooms:
+  - { area: living_room, x: 0, y: 0, w: 6, h: 4 }
+  - { area: kitchen,     x: 6, y: 0, w: 4, h: 4 }
+  - { area: bedroom,     x: 0, y: 4, w: 5, h: 3.4, floor: upstairs }
+    # devices: { light.bedside: {x: 0.2, y: 0.3} }   # place a device (0..1 inside the room)
